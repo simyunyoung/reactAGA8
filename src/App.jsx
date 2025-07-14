@@ -19,6 +19,8 @@ const GAS_COMPONENTS = [
 ];
 
 function App() {
+  // State for standard condition result
+  const [stdResult, setStdResult] = useState(null);
   const [composition, setComposition] = useState([
     80.12,   // Methane
     2,       // Nitrogen
@@ -43,21 +45,24 @@ function App() {
     0        // Argon
   ]);
   // Add pressure unit selector
-  const [pressureUnit, setPressureUnit] = useState('kPa'); // 'bar', 'MPa', 'kPa'
+  const [pressureUnit, setPressureUnit] = useState('bar'); // 'bar', 'MPa', 'kPa'
   // Prefill demo values (do not redeclare pressure/temperature/composition)
   // Only set initial values if not already set
   const [pressure, setPressure] = useState(50000); // kPa
-  const [temperature, setTemperature] = useState(400); // K
+  const [temperature, setTemperature] = useState(15); // degC
   const [result, setResult] = useState(null);
   const [wasmLoaded, setWasmLoaded] = useState(false);
   const [compositionUnit, setCompositionUnit] = useState('percent'); // 'percent' or 'fraction'
   // Add state for SI values
   const [siPressure, setSiPressure] = useState(50); // bar
-  const [siTemperature, setSiTemperature] = useState(323.15); // K
+  const [siTemperature, setSiTemperature] = useState(288.15); // K
 
   useEffect(() => {
     loadWasm().then(() => setWasmLoaded(true));
   }, []);
+
+  // Calculate WASM input temperature (K)
+  const temperature_k = temperature + 273.15;
 
   // Update SI values when user changes input
   useEffect(() => {
@@ -83,10 +88,17 @@ function App() {
     if (pressureUnit === 'bar') pressure_kpa = pressure * 100;
     if (pressureUnit === 'MPa') pressure_kpa = pressure * 1000;
     try {
-      const props = w.calculate_aga8(comp, pressure_kpa, temperature);
+      const props = w.calculate_aga8(comp, pressure_kpa, temperature_k);
       setResult(props);
+
+      // Standard condition: 1 atm (101.325 kPa), 15°C (288.15 K)
+      const stdPressure = 101.325; // kPa
+      const stdTemperature = 273.15 + 15; // K
+      const stdProps = w.calculate_aga8(comp, stdPressure, stdTemperature);
+      setStdResult(stdProps);
     } catch (err) {
       setResult({ error: err.message });
+      setStdResult(null);
     }
   };
 
@@ -118,7 +130,8 @@ function App() {
           <div style={{ marginBottom: 16 }}>
             <label style={{ color: '#555', fontWeight: 500 }}>Temperature: </label>
             <input type="number" step="any" value={temperature} onChange={e => setTemperature(parseFloat(e.target.value))} required style={{ width: 100, border: '1px solid #cfd8dc', borderRadius: 4, padding: '4px 8px', fontSize: 16 }} />
-            <span style={{ marginLeft: 8, color: '#555' }}>K</span>
+            <span style={{ marginLeft: 8, color: '#555' }}>°C</span>
+            <span style={{ marginLeft: 16, color: '#888' }}>WASM input: {temperature_k.toFixed(2)} K</span>
           </div>
           <div style={{ marginBottom: 16 }}>
             <label style={{ color: '#555', fontWeight: 500 }}>Composition unit: </label>
@@ -157,7 +170,7 @@ function App() {
       <hr style={{ border: 0, borderTop: '2px solid #e3eaf2', margin: '32px 0 0 0' }} />
       {result && (
         <div className="result" style={{ marginTop: 32, background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px #0002', padding: 24 }}>
-          <h2 style={{ marginTop: 0, color: '#1967d2', fontWeight: 400 }}>Results</h2>
+          <h2 style={{ marginTop: 0, color: '#1967d2', fontWeight: 400 }}>Results (Input Conditions)</h2>
           {result.error ? (
             <div style={{ color: '#d32f2f' }}>Error: {result.error}</div>
           ) : (
@@ -171,6 +184,7 @@ function App() {
               <tbody>
                 <tr style={{ fontWeight: 600, background: '#e3f2fd', color: '#111' }}><td>Molar concentration [mol/l]</td><td>{result.d}</td></tr>
                 <tr style={{ fontWeight: 600, background: '#e3f2fd', color: '#111' }}><td>Molar mass [g/mol]</td><td>{result.mm}</td></tr>
+                <tr style={{ fontWeight: 600, background: '#e3f2fd', color: '#111' }}><td>Gas density [kg/m³]</td><td>{(result.d * 1000 * result.mm / 1000).toFixed(6)}</td></tr>
                 <tr style={{ fontWeight: 600, background: '#e3f2fd', color: '#111' }}><td>Compressibility factor (Z)</td><td>{result.z}</td></tr>
                 <tr style={{ color: '#111' }}><td>dP/dD</td><td>{result.dp_dd}</td></tr>
                 <tr style={{ color: '#111' }}><td>d²P/dD²</td><td>{result.d2p_dd2}</td></tr>
@@ -187,6 +201,38 @@ function App() {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {stdResult && (
+        <div className="result" style={{ marginTop: 32, background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px #0002', padding: 24 }}>
+          <h2 style={{ marginTop: 0, color: '#388e3c', fontWeight: 400 }}>Results (Standard: 1 atm, 15°C)</h2>
+          <table style={{ borderCollapse: 'collapse', marginTop: 8, width: '100%', color: '#111' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', padding: '8px 12px', background: '#f7fafd', color: '#388e3c', fontWeight: 500, borderBottom: '2px solid #cfd8dc' }}>Property</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', background: '#f7fafd', color: '#388e3c', fontWeight: 500, borderBottom: '2px solid #cfd8dc' }}>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ fontWeight: 600, background: '#e3f2fd', color: '#111' }}><td>Molar concentration [mol/l]</td><td>{stdResult.d}</td></tr>
+              <tr style={{ fontWeight: 600, background: '#e3f2fd', color: '#111' }}><td>Molar mass [g/mol]</td><td>{stdResult.mm}</td></tr>
+              <tr style={{ fontWeight: 600, background: '#e3f2fd', color: '#111' }}><td>Gas density [kg/m³]</td><td>{(stdResult.d * 1000 * stdResult.mm / 1000).toFixed(6)}</td></tr>
+              <tr style={{ fontWeight: 600, background: '#e3f2fd', color: '#111' }}><td>Compressibility factor (Z)</td><td>{stdResult.z}</td></tr>
+              <tr style={{ color: '#111' }}><td>dP/dD</td><td>{stdResult.dp_dd}</td></tr>
+              <tr style={{ color: '#111' }}><td>d²P/dD²</td><td>{stdResult.d2p_dd2}</td></tr>
+              <tr style={{ color: '#111' }}><td>dP/dT</td><td>{stdResult.dp_dt}</td></tr>
+              <tr style={{ color: '#111' }}><td>Internal energy (U)</td><td>{stdResult.u}</td></tr>
+              <tr style={{ color: '#111' }}><td>Enthalpy (H)</td><td>{stdResult.h}</td></tr>
+              <tr style={{ color: '#111' }}><td>Entropy (S)</td><td>{stdResult.s}</td></tr>
+              <tr style={{ color: '#111' }}><td>Cv</td><td>{stdResult.cv}</td></tr>
+              <tr style={{ color: '#111' }}><td>Cp</td><td>{stdResult.cp}</td></tr>
+              <tr style={{ fontWeight: 600, background: '#e3f2fd', color: '#111' }}><td>Speed of sound (W)</td><td>{stdResult.w}</td></tr>
+              <tr style={{ color: '#111' }}><td>Gibbs energy (G)</td><td>{stdResult.g}</td></tr>
+              <tr style={{ color: '#111' }}><td>Joule-Thomson coefficient (JT)</td><td>{stdResult.jt}</td></tr>
+              <tr style={{ color: '#111' }}><td>Kappa</td><td>{stdResult.kappa}</td></tr>
+            </tbody>
+          </table>
         </div>
       )}
     </div>

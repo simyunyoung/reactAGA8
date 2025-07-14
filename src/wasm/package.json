@@ -1,0 +1,23 @@
+{
+  "name": "aga8",
+  "type": "module",
+  "collaborators": [
+    "Roy Vegard Ovesen <roy.vegard.ovesen@gmail.com>"
+  ],
+  "description": "AGA8 equations of state",
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/royvegard/AGA8/tree/rust_ffi_changes/AGA8CODE/RUST"
+  },
+  "files": [
+    "aga8_bg.wasm",
+    "aga8.js",
+    "aga8.d.ts"
+  ],
+  "main": "aga8.js",
+  "types": "aga8.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
